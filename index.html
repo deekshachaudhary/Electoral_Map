@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <title>Electoral Map</title>
+        <script src="https://d3js.org/d3.v4.js"></script>
+    
+        <style>
+            body {
+                position: absolute;
+                height: 700px;
+                width: 800px;
+            }
+
+            div.tooltip {
+                position: absolute;
+                text-align: left;
+                width: 170px;
+                height: 70px;
+                padding: 10px;
+                font: 10px sans-serif;
+                background: lightblue;
+                border: 0px;
+                border-radius: 8px;
+                pointer-events: none;
+            }
+            /*.timeline {
+                position: absolute;
+                text-align: center;
+                top: 60px;
+                left: 0px;
+                padding: 2px;            
+            }
+            .legend {
+                position: absolute;
+                text-align: center;
+                width: 650px;
+                height: 20px;
+                top: 100px;
+                left: 0px;
+                padding: 2px;            
+            }*/
+            div.image {
+                position: absolute;
+                text-align: center;
+                width: 8px;
+                height: 15px;
+                top: 200px;
+                left: 600px;                
+            }
+            div.presidentName {
+                position: absolute;
+                text-align: center;
+                font-family: sans-serif;
+                font-size: 13px;
+                top: 400px;
+                left: 600px;
+                width: 150px;
+                height: 30px;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Electoral Map</h1>
+        <script type="text/javascript">
+            //d3 code here!
+
+            // main svg canvas
+            var width = 700;
+            var height = 600;
+            var padding = 50;
+            
+            var timelineSvgWidth = 600;
+            var timelineSvgHeight = 70;
+
+            var legendSvgWidth = 600;
+            var legendSvgHeight = 60;            
+
+            var rectPadding = 2;
+            var rectWidth = width / 15;
+            var rectHeight = height / 15;
+
+            var mapPadding = 10;
+
+            var xScale = d3.scaleLinear()
+                    .domain([0, 11])                    
+                    .range([0,width]);
+
+            var yScale = d3.scaleLinear()
+                    .domain([0, 7])
+                    .range([0,height]);
+
+            var colorScale = d3.scaleQuantize()
+                    .domain([-60, 60])
+                    .range(["#003D7A", "#02509E", "#2E82BF", "#68ADD8",
+                            "#9CC9E2", "#C5DBF0", "#FEBB9E", "#FE926E",
+                            "#FE6943", "#E12B1B", "#A70A0A", "#890202"])
+
+            var perc_regex = /\d+.\d/;
+
+            var timelineSvg = d3.select("body")
+                            .append("svg")
+                            .attr("width", timelineSvgWidth)
+                            .attr("height", timelineSvgHeight)
+                            .attr("padding", padding)
+                            .attr("class", "timeline");
+
+            var legendSvg = d3.select("body")
+                            .append("svg")
+                            .attr("width", legendSvgWidth)
+                            .attr("height", legendSvgHeight)
+                            .attr("class", "legend");                            
+
+            var canvas = d3.select("body")
+                            .append("svg")
+                            .attr("width", width)
+                            .attr("height", height)
+                            .attr("padding", padding);                      
+            
+            var timeline = d3.select("body")
+                .append("div")
+                .attr("class", "timeline")
+                .style("opacity", 1);
+
+            var legend = d3.select("body")
+                .append("div")
+                .attr("class", "legend")
+                .style("opacity", 1);            
+
+            var image = d3.select("body")
+                .append("div")
+                .attr("class", "image")
+                .style("opacity", 1);
+
+            var presidentName = d3.select("body")
+                .append("div")
+                .attr("class", "presidentName")
+                .style("opacity", 1);
+
+            var tooltip = d3.select("body")
+                .append("div")
+                .attr("class", "tooltip")
+                .style("opacity", 0);
+            
+            var states = [ ["AK", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "ME"],
+                           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "VT", "NH"],
+                           [0, "WA", "ID", "MT", "ND", "MN", "IL", "WI", "MI", "NY", "RI", "MA"],
+                           [0, "OR", "NV", "WY", "SD", "IA", "IN", "OH", "PA", "NJ", "CT", 0],
+                           [0, "CA", "UT", "CO", "NE", "MO", "KY", "WV", "VA", "MD", "DC", 0],
+                           [0, 0, "AZ", "NM", "KS", "AR", "TN", "NC", "SC", "DE", 0, 0],
+                           [0, 0, 0, 0, "OK", "LA", "MS", "AL", "GA", 0, 0, 0],
+                           [0, "HI", 0, 0,"TX", 0, 0, 0, 0, "FL", 0, 0] ]; 
+            
+            var timelineX = d3.scaleLinear()
+                    .domain([0, 19])
+                    .range([20, timelineSvgWidth - 20]);
+
+            var timelineY = 20;
+            
+            var timelineYears = ["1940", "1944", "1948", "1952", "1956",
+                                "1960", "1964", "1968", "1972", "1976",
+                                "1980", "1984", "1988", "1992", "1996",
+                                "2000", "2004", "2008", "2012", "2016"]; 
+            
+            var timelineYearsScale = d3.scaleLinear()
+                    .domain([1940, 2016])
+                    .range([20, timelineSvgWidth - 20]);
+
+            var timelineColor = ["#2E82BF", "#2E82BF", "#2E82BF", "#E12B1B", 
+                                "#E12B1B", "#2E82BF", "#2E82BF", "#E12B1B", 
+                                "#E12B1B", "#2E82BF", "#E12B1B", "#E12B1B",
+                                "#E12B1B", "#2E82BF", "#2E82BF", "#E12B1B",
+                                "#E12B1B", "#2E82BF", "#2E82BF", "#E12B1B"];
+
+            var legendY = 10;
+
+            var legendLabels = ["-60.0 to -50.0", "-50.0 to -40.0", 
+                                "-40.0 to -30.0", "-30.0 to -20.0", 
+                                "-20.0 to -10.0", "-10.0 to 0.0", 
+                                "0.0 to 10.0", "10.0 to 20.0", 
+                                "20.0 to 30.0", "30.0 to 40.0", 
+                                "40.0 to 50.0", "50.0 to 60.0" ];
+
+            // var legendLabelsScale = d3.scaleLinear()
+            //         .domain([0, 11])
+            //         .range([0, legendSvgWidth]);
+                                
+            function getIndexOfK(arr, k) {
+                for (var i = 0; i < arr.length; i++) {
+                    var index = arr[i].indexOf(k);
+                    if (index > -1) {
+                    return [i, index];
+                    }
+                }
+            } 
+            
+            var csvArray = ["election-results-1940.csv", "election-results-1944.csv",
+                        "election-results-1948.csv", "election-results-1952.csv",
+                        "election-results-1956.csv", "election-results-1960.csv", 
+                        "election-results-1964.csv", "election-results-1968.csv", 
+                        "election-results-1972.csv", "election-results-1976.csv", 
+                        "election-results-1980.csv", "election-results-1984.csv", 
+                        "election-results-1988.csv", "election-results-1992.csv", 
+                        "election-results-1996.csv", "election-results-2000.csv", 
+                        "election-results-2004.csv", "election-results-2008.csv", 
+                        "election-results-2012.csv", "election-results-2016.csv" ];
+            
+            var presidentImagesArray = ["https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/FDR_1944_Color_Portrait.tif/lossy-page1-220px-FDR_1944_Color_Portrait.tif.jpg",
+                                "https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/FDR_1944_Color_Portrait.tif/lossy-page1-220px-FDR_1944_Color_Portrait.tif.jpg",
+                                "https://upload.wikimedia.org/wikipedia/commons/e/e6/HarryTruman.jpg",
+                                "https://upload.wikimedia.org/wikipedia/commons/7/78/Dwight_D._Eisenhower%2C_White_House_photo_portrait%2C_February_1959.jpg",
+                                "https://upload.wikimedia.org/wikipedia/commons/7/78/Dwight_D._Eisenhower%2C_White_House_photo_portrait%2C_February_1959.jpg",
+                                "https://upload.wikimedia.org/wikipedia/commons/5/5e/John_F._Kennedy%2C_White_House_photo_portrait%2C_looking_up.jpg",
+                                "https://upload.wikimedia.org/wikipedia/commons/c/c3/37_Lyndon_Johnson_3x4.jpg",
+                                "https://upload.wikimedia.org/wikipedia/commons/3/39/Richard_M._Nixon%2C_ca._1935_-_1982_-_NARA_-_530679.jpg",
+                                "https://upload.wikimedia.org/wikipedia/commons/3/39/Richard_M._Nixon%2C_ca._1935_-_1982_-_NARA_-_530679.jpg",
+                                "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/James_Earl_%22Jimmy%22_Carter_-_NARA_-_558522.tif/lossy-page1-220px-James_Earl_%22Jimmy%22_Carter_-_NARA_-_558522.tif.jpg",
+                                "https://upload.wikimedia.org/wikipedia/commons/1/16/Official_Portrait_of_President_Reagan_1981.jpg",
+                                "https://upload.wikimedia.org/wikipedia/commons/1/16/Official_Portrait_of_President_Reagan_1981.jpg",
+                                "https://upload.wikimedia.org/wikipedia/commons/0/0f/George_H._W._Bush%2C_President_of_the_United_States%2C_1989_official_portrait.jpg",
+                                "https://upload.wikimedia.org/wikipedia/commons/4/49/44_Bill_Clinton_3x4.jpg",
+                                "https://upload.wikimedia.org/wikipedia/commons/4/49/44_Bill_Clinton_3x4.jpg",
+                                "https://upload.wikimedia.org/wikipedia/commons/0/0f/George_H._W._Bush%2C_President_of_the_United_States%2C_1989_official_portrait.jpg",
+                                "https://upload.wikimedia.org/wikipedia/commons/0/0f/George_H._W._Bush%2C_President_of_the_United_States%2C_1989_official_portrait.jpg",
+                                "https://upload.wikimedia.org/wikipedia/commons/8/8d/President_Barack_Obama.jpg",
+                                "https://upload.wikimedia.org/wikipedia/commons/8/8d/President_Barack_Obama.jpg",
+                                "https://upload.wikimedia.org/wikipedia/commons/5/56/Donald_Trump_official_portrait.jpg"];
+
+            var presidentImageMap = {};
+            var presidentNameMap = {};
+
+            presidentImageMap["1940"] = presidentImagesArray[0];
+            presidentImageMap["1944"] = presidentImagesArray[1];
+            presidentImageMap["1948"] = presidentImagesArray[2];
+            presidentImageMap["1952"] = presidentImagesArray[3];
+            presidentImageMap["1956"] = presidentImagesArray[4];
+            presidentImageMap["1960"] = presidentImagesArray[5];
+            presidentImageMap["1964"] = presidentImagesArray[6];
+            presidentImageMap["1968"] = presidentImagesArray[7];
+            presidentImageMap["1972"] = presidentImagesArray[8];
+            presidentImageMap["1976"] = presidentImagesArray[9];
+            presidentImageMap["1980"] = presidentImagesArray[10];
+            presidentImageMap["1984"] = presidentImagesArray[11];
+            presidentImageMap["1988"] = presidentImagesArray[12];
+            presidentImageMap["1992"] = presidentImagesArray[13];
+            presidentImageMap["1996"] = presidentImagesArray[14];
+            presidentImageMap["2000"] = presidentImagesArray[15];
+            presidentImageMap["2004"] = presidentImagesArray[16];
+            presidentImageMap["2008"] = presidentImagesArray[17];
+            presidentImageMap["2012"] = presidentImagesArray[18];
+            presidentImageMap["2016"] = presidentImagesArray[19];
+            
+            var presidentNamesArray = ["Franklin D. Roosevelet - 1940", "Franklin D. Roosevelet - 1944",
+                            "Harry S. Truman - 1948", "Dwight D. Eisenhower - 1952",
+                            "Dwight D. Eisenhower - 1956", "John F. Kennedy - 1960",
+                            "Lyndon B. Johnson - 1964", "Richard Nixon - 1968",
+                            "Richard Nixon - 1972", "Jimmy Carter - 1976",
+                            "Ronald Reagan - 1980", "Ronald Reagan - 1984",
+                            "George H. W. Bush - 1988", "Bill Clinton - 1992",
+                            "Bill Clinton - 1996", "George W. Bush - 2000",
+                            "George W. Bush - 2004", "Barack Obama - 2008",
+                            "Barack Obama - 2012", "Donald Crap Trump - 2016"
+                            ];
+
+            presidentNameMap["1940"] = presidentNamesArray[0];
+            presidentNameMap["1944"] = presidentNamesArray[1];
+            presidentNameMap["1948"] = presidentNamesArray[2];
+            presidentNameMap["1952"] = presidentNamesArray[3];
+            presidentNameMap["1956"] = presidentNamesArray[4];
+            presidentNameMap["1960"] = presidentNamesArray[5];
+            presidentNameMap["1964"] = presidentNamesArray[6];
+            presidentNameMap["1968"] = presidentNamesArray[7];
+            presidentNameMap["1972"] = presidentNamesArray[8];
+            presidentNameMap["1976"] = presidentNamesArray[9];
+            presidentNameMap["1980"] = presidentNamesArray[10];
+            presidentNameMap["1984"] = presidentNamesArray[11];
+            presidentNameMap["1988"] = presidentNamesArray[12];
+            presidentNameMap["1992"] = presidentNamesArray[13];
+            presidentNameMap["1996"] = presidentNamesArray[14];
+            presidentNameMap["2000"] = presidentNamesArray[15];
+            presidentNameMap["2004"] = presidentNamesArray[16];
+            presidentNameMap["2008"] = presidentNamesArray[17];
+            presidentNameMap["2012"] = presidentNamesArray[18];
+            presidentNameMap["2016"] = presidentNamesArray[19];
+            
+
+            var curr_csv = csvArray[19];
+            var curr_year = 2016;
+            var curr_name = presidentNamesArray[19];
+            // d3.csv("election-results-1940", )
+
+            function csv_To_Parse(csvFile) {
+                curr_csv = csvFile;
+            }
+
+            function update_Curr_Year_To(year) {
+                curr_year = year;
+            }
+
+            // function update_Curr_Name_To(name) {
+            //     curr_name = name;
+            // }
+
+            function calls() {
+                draw_Timeline_Line();
+                // draw_Timeline_Circles();
+                draw_Timeline_Years();
+                draw_Legend_Rect();
+                draw_Legend_Labels();          
+            }
+
+            // draw line behind circles in timeline
+            function draw_Timeline_Line() {
+                timelineSvg.append("line")
+                    .attr("x1", 0)
+                    .attr("y1", 20)
+                    .attr("x2", 670)
+                    .attr("y2", 20)
+                    .attr("stroke", "black")
+                    .attr("stroke-width", "2px");
+            }
+
+            function draw_Timeline_Circles(){
+           // timeline
+                timelineSvg.selectAll("circle")
+                    .data([0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+                        10, 11, 12, 13, 14, 15, 16, 17, 18, 19])
+                    .enter()
+                    .append("circle")
+                    .attr("cx", function(d) {
+                        return timelineX(+d);
+                    })
+                    .attr("cy", timelineY)
+                    .attr("r", 10)
+                    .attr("fill", function(d, i) {
+                        return timelineColor[i];
+                        // if(Democrats_sum > Republicans_sum) {
+                        //     return "#2E82BF";
+                        // }
+                        // else if(Republicans_sum > Democrats_sum) {
+                        //   
+                        //   return "#E12B1B";
+                        // }
+
+                    })
+
+                    .on("click", function(d) {
+                            csv_To_Parse(csvArray[d]);
+                            // store_Curr_Year(d.Year)
+                            d3.csv(curr_csv, function(data) {                
+
+                            data.forEach(function(row) {
+                                var colNames = (Object.keys(row));
+                                var State = colNames[0];
+                                var Abbreviation = colNames[1];
+                                var Total_EV = colNames[2];
+                                var D_Nominee = colNames[3];
+                                var D_Percentage = colNames[4];
+                                var D_Votes = colNames[5];
+                                var R_Nominee = colNames[6];
+                                var R_Percentage = colNames[7];
+                                var R_Votes = colNames[8];
+                                var Year = colNames[9];
+                            });
+                            canvas.selectAll("*").remove();
+                            d3.select(".image").html("");
+                            d3.select(".presidentName").text("");
+                            update_Curr_Year_To(timelineYears[d]);                            
+                            draw_States(data, timelineYears[d]);
+                            draw_State_Names(data);
+
+                            // draw_President_Name(presidentNames[d]);
+                            console.log(timelineYears[d]);
+                            // draw_Image(timelineYears[d]);
+                        })                       
+                    });
+            }
+
+            
+                // timeline years
+            function draw_Timeline_Years() {    
+                    timelineSvg.selectAll("text")
+                        .data(timelineYears)
+                        .enter()
+                        .append("text")
+                        .text(function(d){
+                            return d;
+                        })
+                        .attr("text-anchor","middle")
+                        .attr("x", function(d, i) {
+                            return timelineYearsScale(+d);
+                        })
+                        .attr("y", function(d) {
+                            return 40;
+                        })
+                        .attr("font-family", "sans-serif")
+                        .attr("font-size", "9px")
+                        .attr("fill", "black");
+            }
+
+            // legend
+            function draw_Legend_Rect() {
+                legendSvg.selectAll("rect")
+                    .data(colorScale.range())
+                    .enter()
+                    .append("rect")
+                    .attr("x", function(d, i){
+                        return i * 50;
+                    })
+                    .attr("y", legendY)
+                    .attr("width", 600)
+                    .attr("height", 7)
+                    .attr("stroke", "white")
+                    .attr("stroke-width", "1px")
+                    .attr("fill", function(d) {
+                        return d;
+                    });
+            }
+
+            // legend labels
+            function draw_Legend_Labels() {
+                legendSvg.selectAll("text")
+                    .data(legendLabels)
+                    .enter()
+                    .append("text")
+                    .text(function(d){
+                        return d;
+                    })                    
+                    .attr("x", function(d, i) {
+                        return i * 50 + 5;
+                    })
+                    .attr("y", legendY + 20)
+                    .attr("font-family", "sans-serif")
+                    .attr("font-size", "8px")
+                    .attr("fill", "black");
+            }
+
+            function draw_States(data, timelineyear) {
+                canvas.selectAll("rect")
+                    .data(data)
+                    .enter()
+                    .append("rect")
+                    .attr( "x", function(d) {
+                        return getIndexOfK(states, d.Abbreviation)[1] 
+                            * (width /15 + rectPadding);
+                    })
+                    .attr( "y", function(d) { 
+                        return getIndexOfK(states, d.Abbreviation)[0] 
+                            * (height / 15 + rectPadding) + mapPadding ;
+                    })
+                    .attr("width", rectWidth)
+                    .attr("height", rectHeight)
+                    .attr("fill", function(d){
+                        var perTr = +d["R_Percentage"].match(perc_regex);
+                        var perCl = +d["D_Percentage"].match(perc_regex);
+                        var diff = +perTr - +perCl;
+
+                        return colorScale(+diff);
+                    })
+                    .on("mouseover", function(d){
+                        tooltip.html(
+                            "<strong>"+d["State"]+
+                        "</strong><br><br>Electoral Votes: "
+                                +d.Total_EV+
+                                "<br>" +d.D_Nominee+ ": " 
+                                +d.D_Votes+ " ("
+                                +d.D_Percentage+ 
+                                ")<br>" +d.R_Nominee+ ": "
+                                +d.R_Votes+ " ("
+                                +d.R_Percentage+ ")"
+                        )   
+                        
+                        .style("left", (d3.event.pageX) + "px")
+                        .style("top", (d3.event.pageY - 28) + "px")
+                        .style("opacity", .9);
+                    })                    
+                    .on("mouseout", function(d) {
+                        tooltip.style("opacity", 0);
+                    });
+                    draw_Image(curr_year);
+                    draw_President_Name(curr_year);
+                    // d3.select(".image").html("");                            
+                            
+            }
+
+            function draw_State_Names(data) {
+                canvas.selectAll("text")
+                    .data(data)
+                    .enter()
+                    .append("text")
+                    .text(function(d){
+                        return (d.Abbreviation+
+                                "\r\n" +d.Total_EV);
+                    })
+                    .attr("text-anchor","middle")
+                    .attr("x", function(d) {
+                        return getIndexOfK(states, d.Abbreviation)[1]
+                            * (width / 15 + rectPadding) + rectWidth / 2;
+                    })
+                    .attr("y", function(d) {
+                        return getIndexOfK(states, d.Abbreviation)[0]
+                            * (height / 15 + rectPadding) 
+                            + rectHeight / 2 + mapPadding;
+                    })
+                    .attr("font-family", "sans-serif")
+                    .attr("font-size", "10px")
+                    .attr("fill", "black");
+            }
+
+            function draw_Image(year) {
+                            d3.select(".image")
+                                .append("img")
+                                .attr("src", presidentImageMap[year])
+                                
+                                .attr("width", "150")
+                                .attr("height", "180");
+                                console.log(year);
+                                console.log(presidentImageMap[year]);    
+                
+            }
+
+            function draw_President_Name(curr_year) {
+                d3.select(".presidentName")
+                    .append("text")
+                    .text(presidentNameMap[curr_year])
+                    .attr("class", ".presidentName")
+                    .attr("stroke", "black")
+                    .attr("stroke-width", "2px");
+                    console.log(curr_year);
+                    console.log(presidentNameMap[curr_year]);
+            }
+
+            // function parseCSV(curr_csv) {
+                d3.csv(curr_csv, function(data) {                
+
+                    data.forEach(function(row) {
+                        var colNames = (Object.keys(row));
+                        var State = colNames[0];
+                        var Abbreviation = colNames[1];
+                        var Total_EV = colNames[2];
+                        var D_Nominee = colNames[3];
+                        var D_Percentage = colNames[4];
+                        var D_Votes = colNames[5];
+                        var R_Nominee = colNames[6];
+                        var R_Percentage = colNames[7];
+                        var R_Votes = colNames[8];
+                        var Year = colNames[9];
+                    });
+                    calls();
+                    draw_Timeline_Circles(data);
+                    draw_States(data);
+                    draw_State_Names(data);
+                });
+ 
+        </script>
+    </body>
+</html>
