@@ -1,8 +1,5 @@
-I implemented all the extra credit parts.
-
-Link to Electoral Map online:
+Link to Electoral Map:
 https://deekshachaudhary.bitbucket.io/Electoral_Map/
 
-
-Link to all the three assignments:
+Link to other Processing.js and D3.js assignments:
 https://deekshachaudhary.bitbucket.io/allAssignmentsOnline/
